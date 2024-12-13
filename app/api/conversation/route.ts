@@ -1,18 +1,15 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { Configuration,OpenAIApi } from "openai"; // Import OpenAI SDK from the correct path
 
-// Initialize OpenAI API with API key
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY, // Ensure the environment variable is correctly named
-});
-const openai = new OpenAIApi(configuration) 
-
+// Replace OpenAI with a fetch request to GroqCloud
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
     const body = await req.json();
     const { messages } = body;
+
+    console.log("User ID:", userId);
+    console.log("Received Messages:", messages);
 
     if (!userId) {
       return NextResponse.json(
@@ -21,30 +18,38 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!configuration.apiKey) {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json(
-        { error: "OpenAI API Key not configured" },
-        { status: 500 }
-      );
-    }
-
-    if (!messages) {
-      return NextResponse.json(
-        { error: "Messages are required and must be an array" },
+        { error: "Messages are required and must be a non-empty array" },
         { status: 400 }
       );
     }
 
-    // Call OpenAI's API (GPT-4 example)
-    const response = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
-      messages: messages, // Pass the messages to the API
+    // Replace with GroqCloud API call
+    const response = await fetch("//api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQCLOUD_API_KEY}`, // Ensure this is set in your environment variables
+      },
+      body: JSON.stringify({ messages }),
     });
 
-    // Return the AI response
-    return NextResponse.json(response.data.choices[0].message);
-  } catch (error) {
-    console.error("[CONVERSATION_ERROR]", error);
+    if (!response.ok) {
+      console.error("GroqCloud API Error:", await response.text());
+      return NextResponse.json(
+        { error: "GroqCloud API error" },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    console.log("GroqCloud Response:", data);
+
+    // Assuming `data.reply` contains the response message
+    return NextResponse.json(data.reply);
+  } catch (error: any) {
+    console.error("[CONVERSATION_ERROR]", error.message);
     return NextResponse.json(
       { error: "Internal Error" },
       { status: 500 }

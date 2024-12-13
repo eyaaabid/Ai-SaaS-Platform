@@ -7,16 +7,16 @@ import { MessageSquare } from "lucide-react";
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
-import { formSchema } from "./constants"; 
+import { formSchema } from "./constants";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import OpenAI, { ChatCompletionRequestMessage } from 'openai'; // Import OpenAI client
+import { ChatCompletionRequestMessage } from "openai";
 
 const ConversationPage = () => {
   const router = useRouter();
-  const [messages, setMessages] = useState<ChatCompletionRequestMessage[]>([]); // Use the correct type
+  const [messages, setMessages] = useState<ChatCompletionRequestMessage[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -28,7 +28,7 @@ const ConversationPage = () => {
   const isLoading = form.formState.isSubmitting;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    console.log(values);
+    console.log("Submitting values:", values);
 
     try {
       const userMessage: ChatCompletionRequestMessage = {
@@ -37,19 +37,34 @@ const ConversationPage = () => {
       };
 
       const newMessages = [...messages, userMessage];
+      console.log("Messages array:", newMessages);
 
-      const response = await axios.post("./api/conversation", {
-        messages: newMessages,
-      });
+      const response = await axios.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          model: "llama3-8b-8192", // Ensure this is a valid model name.
+          messages: newMessages,
+        },
+        {
+          headers: {
+            Authorization: `Bearer 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`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
+      console.log("API Response:", response.data);
+
+      // Add userMessage and API response to messages
       setMessages((current) => [
         ...current,
         userMessage,
-        response.data,
+        response.data.choices[0].message,
       ]);
 
       form.reset();
-    } catch (error:any) {
+    } catch (error: any) {
+      console.error("Error response data:", error.response?.data);
       console.error("Error during submission:", error);
     } finally {
       router.refresh();
@@ -80,7 +95,7 @@ const ConversationPage = () => {
                       <Input
                         className="border-0 outline-none focus-visible:ring-0 focus-visible:ring-transparent"
                         disabled={isLoading}
-                        placeholder="How do I calculate the radius of a circle?"
+                        placeholder="Ask me something..."
                         {...field}
                       />
                     </FormControl>
@@ -98,9 +113,9 @@ const ConversationPage = () => {
         </div>
         <div className="space-y-4 mt-4">
           <div className="flex flex-col-reverse gap-y-4">
-            {messages.map((message) => (
-              <div key={message.content}>
-                {message.content}
+            {messages.map((message, index) => (
+              <div key={`${message.role}-${index}`}>
+                <strong>{message.role}:</strong> {message.content}
               </div>
             ))}
           </div>
